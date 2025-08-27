@@ -1,0 +1,9 @@
+node_modules/
+.env
+*.log
+x.js
+com.txt
+examples/
+src/
+tsconfig.json
+.gitignore 

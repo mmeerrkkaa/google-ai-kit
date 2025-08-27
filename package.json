@@ -1,0 +1,46 @@
+{
+  "name": "google-ai-kit",
+  "version": "1.0.4",
+  "description": "TypeScript/JavaScript SDK для работы с Google Gemini AI API с поддержкой прокси, множественных API ключей и автоматическим переключением при ошибках",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "gemini",
+    "google-ai",
+    "ai",
+    "api",
+    "typescript",
+    "javascript",
+    "chatbot",
+    "proxy",
+    "multiple-api-keys"
+  ],
+  "author": "merka",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mmeerrkkaa/google-ai-kit.git"
+  },
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "@types/node-fetch": "^2.6.12",
+    "https-proxy-agent": "^7.0.6",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@types/form-data": "^2.2.1",
+    "dotenv": "^16.5.0",
+    "form-data": "^4.0.2",
+    "node-fetch": "^2.7.0"
+  }
+}
