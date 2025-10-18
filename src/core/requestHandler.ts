@@ -2,7 +2,7 @@ import fetch, { RequestInit, Response } from 'node-fetch';
 import OriginalFormData from 'form-data';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { GeminiClientConfig, DEFAULT_GEMINI_CONFIG, ProxyConfig } from './config';
-import { APIKeyError, NetworkError, handleErrorResponse, GoogleAIError, ConsumerSuspendedError } from './errors';
+import { APIKeyError, NetworkError, handleErrorResponse, GoogleAIError, ConsumerSuspendedError, RateLimitError } from './errors';
 import { Readable } from 'stream';
 
 export class RequestHandler {
@@ -110,6 +110,13 @@ export class RequestHandler {
             apiKeyAttempts++;
             const suspendedKeyPreview = apiKey.substring(0, 10) + '...';
             console.warn(`API ключ ${suspendedKeyPreview} (ключ #${currentKeyIndex + 1}) приостановлен, переключаюсь на следующий (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`);
+            continue;
+          }
+
+          if (apiError instanceof RateLimitError && apiKeyAttempts < maxApiKeyAttempts - 1) {
+            apiKeyAttempts++;
+            const rateLimitedKeyPreview = apiKey.substring(0, 10) + '...';
+            console.warn(`API ключ ${rateLimitedKeyPreview} (ключ #${currentKeyIndex + 1}) превысил квоту, переключаюсь на следующий (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`);
             continue;
           }
 
