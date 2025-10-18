@@ -126,6 +126,7 @@ export class GeminiClient {
     request: GenerateContentRequest,
     model?: string
   ): Promise<EnhancedGenerateContentResponse> {
+    const modelToUse = request.model || model;
     let currentApiContents: Content[] = [];
     let interactionToStoreUserContent: Content | undefined;
 
@@ -179,7 +180,7 @@ export class GeminiClient {
         }
 
 
-        const apiRequestPayload: Omit<GenerateContentRequest, 'prompt' | 'user' | 'tools'> & { tools?: Tool[] } = {
+        const apiRequestPayload: Omit<GenerateContentRequest, 'prompt' | 'user' | 'tools' | 'model'> & { tools?: Tool[] } = {
             safetySettings: request.safetySettings,
             generationConfig: request.generationConfig,
             systemInstruction: request.systemInstruction,
@@ -189,8 +190,9 @@ export class GeminiClient {
         };
         delete (apiRequestPayload as any).user;
         delete (apiRequestPayload as any).prompt;
+        delete (apiRequestPayload as any).model;
 
-        const path = `${this.getModelPath(model)}:generateContent`;
+        const path = `${this.getModelPath(modelToUse)}:generateContent`;
         const rawResponse = await this.requestHandler.request<GenerateContentResponse>(
             'POST', path, apiRequestPayload, false
         );
@@ -300,6 +302,7 @@ export class GeminiClient {
     request: GenerateContentRequest,
     model?: string
   ): AsyncIterable<StreamGenerateContentResponse> {
+    const modelToUse = request.model || model;
     let apiContents: Content[] = [];
 
     if (request.prompt) {
@@ -338,7 +341,7 @@ export class GeminiClient {
         }
     }
 
-    const streamApiRequest: Omit<GenerateContentRequest, 'prompt' | 'user' | 'tools'> & { tools?: Tool[] } = {
+    const streamApiRequest: Omit<GenerateContentRequest, 'prompt' | 'user' | 'tools' | 'model'> & { tools?: Tool[] } = {
       safetySettings: request.safetySettings,
       generationConfig: { ...request.generationConfig, candidateCount: 1 },
       systemInstruction: request.systemInstruction,
@@ -348,8 +351,9 @@ export class GeminiClient {
     };
     delete (streamApiRequest as any).user;
     delete (streamApiRequest as any).prompt;
+    delete (streamApiRequest as any).model;
 
-    const path = `${this.getModelPath(model)}:streamGenerateContent?alt=SSE`;
+    const path = `${this.getModelPath(modelToUse)}:streamGenerateContent?alt=SSE`;
     const stream = await this.requestHandler.request<ReadableStream<Uint8Array>>(
         'POST', path, streamApiRequest, true
     );

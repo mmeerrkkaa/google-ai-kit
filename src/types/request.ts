@@ -10,6 +10,7 @@ import {
 export interface GenerateContentRequest {
   prompt?: string;
   contents?: Content[];
+  model?: string;
   safetySettings?: SafetySetting[];
   generationConfig?: GenerationConfig;
   tools?: Tool[];
