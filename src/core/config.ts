@@ -26,7 +26,8 @@ export interface GeminiClientConfig {
   requestTimeout?: number;
   maxRetries?: number;
   messageStoreConfig?: MessageStoreConfig;
-  defaultMaxToolCalls?: number; 
+  defaultMaxToolCalls?: number;
+  debugMode?: boolean;
 }
 
 export const DEFAULT_GEMINI_CONFIG: Omit<GeminiClientConfig, 'apiKeys'> = {

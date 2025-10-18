@@ -6,7 +6,7 @@ import { APIKeyError, NetworkError, handleErrorResponse, GoogleAIError, Consumer
 import { Readable } from 'stream';
 
 export class RequestHandler {
-  private config: Required<Omit<GeminiClientConfig, 'proxy' | 'defaultModel'>> & { proxy?: ProxyConfig, defaultModel?: string };
+  private config: Required<Omit<GeminiClientConfig, 'proxy' | 'defaultModel' | 'debugMode'>> & { proxy?: ProxyConfig, defaultModel?: string, debugMode?: boolean };
   private currentApiKeyIndex: number = 0;
   private proxyAgent?: HttpsProxyAgent<string>;
 
@@ -53,6 +53,11 @@ export class RequestHandler {
     while (true) {
       const currentKeyIndex = this.currentApiKeyIndex;
       const apiKey = this.getNextApiKey();
+
+      if (this.config.debugMode) {
+        const keyPreview = apiKey.substring(0, 10) + '...';
+        console.log(`[DEBUG] Используется API ключ #${currentKeyIndex + 1}: ${keyPreview}`);
+      }
 
       const headers: Record<string, string> = {
         'X-Goog-Api-Key': apiKey,
@@ -109,14 +114,23 @@ export class RequestHandler {
           if (apiError instanceof ConsumerSuspendedError && apiKeyAttempts < maxApiKeyAttempts - 1) {
             apiKeyAttempts++;
             const suspendedKeyPreview = apiKey.substring(0, 10) + '...';
-            console.warn(`API ключ ${suspendedKeyPreview} (ключ #${currentKeyIndex + 1}) приостановлен, переключаюсь на следующий (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`);
+            const message = `API ключ ${suspendedKeyPreview} (ключ #${currentKeyIndex + 1}) приостановлен, переключаюсь на следующий (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
+            console.warn(`[ПЕРЕКЛЮЧЕНИЕ КЛЮЧА] ${message}`);
+            if (this.config.debugMode) {
+              console.log(`[DEBUG] Причина: ConsumerSuspendedError - ${apiError.message}`);
+            }
             continue;
           }
 
           if (apiError instanceof RateLimitError && apiKeyAttempts < maxApiKeyAttempts - 1) {
             apiKeyAttempts++;
             const rateLimitedKeyPreview = apiKey.substring(0, 10) + '...';
-            console.warn(`API ключ ${rateLimitedKeyPreview} (ключ #${currentKeyIndex + 1}) превысил квоту, переключаюсь на следующий (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`);
+            const message = `API ключ ${rateLimitedKeyPreview} (ключ #${currentKeyIndex + 1}) превысил квоту, переключаюсь на следующий (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
+            console.warn(`[ПЕРЕКЛЮЧЕНИЕ КЛЮЧА] ${message}`);
+            if (this.config.debugMode) {
+              console.log(`[DEBUG] Причина: RateLimitError - ${apiError.message}`);
+              console.log(`[DEBUG] Следующий ключ будет: #${(this.currentApiKeyIndex % this.config.apiKeys.length) + 1}`);
+            }
             continue;
           }
 
