@@ -32,10 +32,12 @@ export class RequestHandler {
     }
   }
 
-  private getNextApiKey(): string {
-    const key = this.config.apiKeys[this.currentApiKeyIndex];
+  private getCurrentApiKey(): string {
+    return this.config.apiKeys[this.currentApiKeyIndex];
+  }
+
+  private switchToNextApiKey(): void {
     this.currentApiKeyIndex = (this.currentApiKeyIndex + 1) % this.config.apiKeys.length;
-    return key;
   }
 
   public async request<TResponse>(
@@ -52,7 +54,7 @@ export class RequestHandler {
 
     while (true) {
       const currentKeyIndex = this.currentApiKeyIndex;
-      const apiKey = this.getNextApiKey();
+      const apiKey = this.getCurrentApiKey();
 
       if (this.config.debugMode) {
         const keyPreview = apiKey.substring(0, 10) + '...';
@@ -114,10 +116,13 @@ export class RequestHandler {
           if (apiError instanceof ConsumerSuspendedError && apiKeyAttempts < maxApiKeyAttempts - 1) {
             apiKeyAttempts++;
             const suspendedKeyPreview = apiKey.substring(0, 10) + '...';
-            const message = `API ключ ${suspendedKeyPreview} (ключ #${currentKeyIndex + 1}) приостановлен, переключаюсь на следующий (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
+            this.switchToNextApiKey();
+            const nextKeyPreview = this.getCurrentApiKey().substring(0, 10) + '...';
+            const message = `API ключ ${suspendedKeyPreview} (ключ #${currentKeyIndex + 1}) приостановлен, переключаюсь на ключ #${this.currentApiKeyIndex + 1} (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
             console.warn(`[ПЕРЕКЛЮЧЕНИЕ КЛЮЧА] ${message}`);
             if (this.config.debugMode) {
               console.log(`[DEBUG] Причина: ConsumerSuspendedError - ${apiError.message}`);
+              console.log(`[DEBUG] Следующий ключ: #${this.currentApiKeyIndex + 1}: ${nextKeyPreview}`);
             }
             continue;
           }
@@ -125,11 +130,13 @@ export class RequestHandler {
           if (apiError instanceof RateLimitError && apiKeyAttempts < maxApiKeyAttempts - 1) {
             apiKeyAttempts++;
             const rateLimitedKeyPreview = apiKey.substring(0, 10) + '...';
-            const message = `API ключ ${rateLimitedKeyPreview} (ключ #${currentKeyIndex + 1}) превысил квоту, переключаюсь на следующий (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
+            this.switchToNextApiKey();
+            const nextKeyPreview = this.getCurrentApiKey().substring(0, 10) + '...';
+            const message = `API ключ ${rateLimitedKeyPreview} (ключ #${currentKeyIndex + 1}) превысил квоту, переключаюсь на ключ #${this.currentApiKeyIndex + 1} (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
             console.warn(`[ПЕРЕКЛЮЧЕНИЕ КЛЮЧА] ${message}`);
             if (this.config.debugMode) {
               console.log(`[DEBUG] Причина: RateLimitError - ${apiError.message}`);
-              console.log(`[DEBUG] Следующий ключ будет: #${(this.currentApiKeyIndex % this.config.apiKeys.length) + 1}`);
+              console.log(`[DEBUG] Следующий ключ: #${this.currentApiKeyIndex + 1}: ${nextKeyPreview}`);
             }
             continue;
           }
