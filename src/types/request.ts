@@ -20,7 +20,8 @@ export interface GenerateContentRequest {
 }
 
 export interface CountTokensRequest {
-  contents: Content[];
+  contents?: Content[];
+  generateContentRequest?: GenerateContentRequest;
 }
 
 export interface EmbedContentRequest {

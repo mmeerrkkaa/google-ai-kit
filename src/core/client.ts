@@ -406,10 +406,23 @@ export class GeminiClient {
   }
 
   async countTokens(
-    request: CountTokensRequest, model?: string
+    request: CountTokensRequest | string,
+    model?: string
   ): Promise<CountTokensResponse> {
-    const path = `${this.getModelPath(model)}:countTokens`;
-    const response = await this.requestHandler.request<CountTokensResponse>('POST', path, request, false);
+    const modelToUse = model || this.config.defaultModel;
+    const path = `${this.getModelPath(modelToUse)}:countTokens`;
+
+    let requestBody: CountTokensRequest;
+
+    if (typeof request === 'string') {
+      requestBody = {
+        contents: [{ role: 'user', parts: [{ text: request }] }]
+      };
+    } else {
+      requestBody = request;
+    }
+
+    const response = await this.requestHandler.request<CountTokensResponse>('POST', path, requestBody, false);
     if (response instanceof ReadableStream) {
         throw new Error("countTokens received a stream when a direct response was expected.");
     }

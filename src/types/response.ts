@@ -27,7 +27,15 @@ json<T = any>(): T | null;
 }
 
 export interface CountTokensResponse {
-totalTokens: number;
+  totalTokens: number;
+  cachedContentTokenCount?: number;
+  promptTokensDetails?: ModalityTokenCount[];
+  cacheTokensDetails?: ModalityTokenCount[];
+}
+
+export interface ModalityTokenCount {
+  modality?: string;
+  tokenCount?: number;
 }
 
 export interface EmbedContentResponse {
