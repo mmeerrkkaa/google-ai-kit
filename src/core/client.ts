@@ -1,6 +1,7 @@
 import { RequestHandler } from './requestHandler';
 import { GeminiClientConfig, DEFAULT_GEMINI_CONFIG, DEFAULT_GEMINI_CLIENT_MAX_TOOL_CALLS } from './config';
 import { FileManager } from '../features/fileManager';
+import { ChatManager } from '../features/chat';
 import {
   GenerateContentRequest,
   GenerateContentResponse,
@@ -27,6 +28,7 @@ export class GeminiClient {
   private config: Required<Omit<GeminiClientConfig, 'proxy' | 'defaultModel' | 'messageStoreConfig' | 'defaultMaxToolCalls'>> &
                   Pick<GeminiClientConfig, 'proxy' | 'defaultModel' | 'messageStoreConfig' | 'defaultMaxToolCalls'>;
   public readonly files: FileManager;
+  public readonly chats: ChatManager;
   public messageStore?: IMessageStore;
 
   constructor(config: GeminiClientConfig) {
@@ -40,6 +42,7 @@ export class GeminiClient {
 
     this.requestHandler = new RequestHandler(this.config);
     this.files = new FileManager(this.requestHandler, this.config.apiEndpoint);
+    this.chats = new ChatManager(this);
 
     if (this.config.messageStoreConfig) {
       if (this.config.messageStoreConfig.type === 'memory') {
