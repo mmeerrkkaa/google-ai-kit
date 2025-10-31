@@ -71,7 +71,21 @@ export interface GenerationConfig {
   topK?: number;
   responseMimeType?: "text/plain" | "application/json";
   responseSchema?: Schema;
+  thinkingConfig?: ThinkingConfig;
   // maxToolCalls (или maxCalls) теперь в FunctionCallingConfig
+}
+
+export interface ThinkingConfig {
+  /**
+   * Включить или выключить thinking mode
+   * @default false
+   */
+  mode?: 'enabled' | 'disabled';
+
+  /**
+   * Максимальное количество токенов для reasoning
+   */
+  maxThinkingTokens?: number;
 }
 
 export interface FunctionDeclaration {

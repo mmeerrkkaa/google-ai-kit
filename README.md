@@ -647,6 +647,85 @@ console.log('Размерность:', response.embedding.values.length);
 
 ---
 
+## 🧠 Thinking Mode
+
+Thinking mode позволяет модели "обдумать" ответ перед генерацией, что улучшает качество ответов на сложные вопросы.
+
+### Chat API с Thinking Mode
+
+```javascript
+const chat = client.chats.create({
+  model: 'gemini-2.5-flash',
+  generationConfig: {
+    thinkingConfig: {
+      mode: 'enabled',           // 'enabled' или 'disabled'
+      maxThinkingTokens: 1000    // Лимит токенов для размышлений
+    }
+  }
+});
+
+const response = await chat.sendMessage(
+  'Решите сложную математическую задачу: ...'
+);
+console.log(response.text());
+```
+
+### Расширенный API с Thinking Mode
+
+```javascript
+const response = await client.generateContent({
+  prompt: 'Объясни квантовую запутанность',
+  generationConfig: {
+    temperature: 0.7,
+    thinkingConfig: {
+      mode: 'enabled',
+      maxThinkingTokens: 1500
+    }
+  }
+}, 'gemini-2.0-flash-thinking-exp');
+```
+
+### Динамическое управление
+
+```javascript
+const chat = client.chats.create({
+  model: 'gemini-2.0-flash-thinking-exp'
+});
+
+// Простой вопрос - без thinking
+chat.setGenerationConfig({
+  thinkingConfig: { mode: 'disabled' }
+});
+await chat.sendMessage('Привет!');
+
+// Сложный вопрос - включаем thinking
+chat.setGenerationConfig({
+  thinkingConfig: {
+    mode: 'enabled',
+    maxThinkingTokens: 1000
+  }
+});
+await chat.sendMessage('Объясни теорию относительности');
+```
+
+### Когда использовать Thinking Mode?
+
+✅ **Используйте для:**
+- Сложных математических задач
+- Логических головоломок
+- Анализа научных концепций
+- Задач требующих пошагового рассуждения
+- Программирования сложных алгоритмов
+
+❌ **Не нужен для:**
+- Простых приветствий
+- Генерации текста
+- Перевода
+- Суммаризации
+- Простых вопросов
+
+---
+
 ## 📖 API Reference
 
 ### GeminiClient

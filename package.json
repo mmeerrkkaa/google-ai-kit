@@ -1,6 +1,6 @@
 {
   "name": "google-ai-kit",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "TypeScript/JavaScript SDK для работы с Google Gemini AI API с поддержкой прокси, множественных API ключей и автоматическим переключением при ошибках",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -34,13 +34,13 @@
   "devDependencies": {
     "@types/node": "^22.15.21",
     "@types/node-fetch": "^2.6.12",
-    "https-proxy-agent": "^7.0.6",
     "typescript": "^5.8.3"
   },
   "dependencies": {
     "@types/form-data": "^2.2.1",
     "dotenv": "^16.5.0",
     "form-data": "^4.0.2",
+    "https-proxy-agent": "^7.0.6",
     "node-fetch": "^2.7.0"
   }
 }
