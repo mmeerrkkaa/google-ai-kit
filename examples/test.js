@@ -3,7 +3,7 @@ require('dotenv').config();
 
 async function runBooruTagAssistant() {
   const apiKey = [
-    "AIzaSyACQFe9RG5raYIFaGZl1z_LlKb8Jnb_0BE"
+    ""
   ];
 
   const proxyConfig = {

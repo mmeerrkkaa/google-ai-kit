@@ -9,6 +9,7 @@ export class RequestHandler {
   private config: Required<Omit<GeminiClientConfig, 'proxy' | 'defaultModel' | 'debugMode'>> & { proxy?: ProxyConfig, defaultModel?: string, debugMode?: boolean };
   private currentApiKeyIndex: number = 0;
   private proxyAgent?: HttpsProxyAgent<string>;
+  private dailyQuotaExhaustedKeys: Set<number> = new Set(); // Индексы ключей с исчерпанной дневной квотой
 
   constructor(config: GeminiClientConfig) {
     if (!config.apiKeys || config.apiKeys.length === 0) {
@@ -40,6 +41,19 @@ export class RequestHandler {
     this.currentApiKeyIndex = (this.currentApiKeyIndex + 1) % this.config.apiKeys.length;
   }
 
+  private getAvailableKeysCount(): number {
+    return this.config.apiKeys.length - this.dailyQuotaExhaustedKeys.size;
+  }
+
+  private markKeyAsExhausted(keyIndex: number): void {
+    this.dailyQuotaExhaustedKeys.add(keyIndex);
+    console.error(`🚫 API ключ #${keyIndex + 1} помечен как исчерпавший дневную квоту (не будет использоваться до 00:00 UTC)`);
+  }
+
+  private isKeyAvailable(keyIndex: number): boolean {
+    return !this.dailyQuotaExhaustedKeys.has(keyIndex);
+  }
+
   public async request<TResponse>(
     method: 'GET' | 'POST' | 'DELETE',
     path: string,
@@ -54,12 +68,28 @@ export class RequestHandler {
     let consecutiveRateLimitErrors = 0; // Счётчик подряд идущих RateLimitError
 
     while (true) {
+      // Проверяем, остались ли доступные ключи
+      const availableKeysCount = this.getAvailableKeysCount();
+      if (availableKeysCount === 0) {
+        throw new RateLimitError(`Все ${this.config.apiKeys.length} API ключей исчерпали дневную квоту. Попробуйте повторить запрос после 00:00 UTC.`);
+      }
+
       const currentKeyIndex = this.currentApiKeyIndex;
+
+      // Пропускаем ключи с исчерпанной дневной квотой
+      if (!this.isKeyAvailable(currentKeyIndex)) {
+        if (this.config.debugMode) {
+          console.log(`[DEBUG] Пропуск ключа #${currentKeyIndex + 1} (дневная квота исчерпана)`);
+        }
+        this.switchToNextApiKey();
+        continue;
+      }
+
       const apiKey = this.getCurrentApiKey();
 
       if (this.config.debugMode) {
         const keyPreview = apiKey.substring(0, 10) + '...';
-        console.log(`[DEBUG] Используется API ключ #${currentKeyIndex + 1}: ${keyPreview}`);
+        console.log(`[DEBUG] Используется API ключ #${currentKeyIndex + 1}: ${keyPreview} (доступных ключей: ${availableKeysCount}/${this.config.apiKeys.length})`);
       }
 
       const headers: Record<string, string> = {
@@ -161,12 +191,35 @@ export class RequestHandler {
 
           // Rate Limit Error
           if (apiError instanceof RateLimitError) {
+            // Проверяем, это дневная квота (3М токенов) или минутная (2 RPM)
+            const isDailyQuota = apiError.message.includes('free_tier_input_token_count') ||
+                                apiError.message.includes('free_tier_output_token_count');
+
+            if (isDailyQuota) {
+              // Дневная квота исчерпана - помечаем ключ как недоступный
+              this.markKeyAsExhausted(currentKeyIndex);
+              const availableKeys = this.getAvailableKeysCount();
+
+              console.error(`💀 API ключ #${currentKeyIndex + 1} исчерпал ДНЕВНУЮ квоту (доступно ключей: ${availableKeys}/${this.config.apiKeys.length})`);
+
+              if (availableKeys === 0) {
+                // Все ключи исчерпали дневную квоту
+                throw new RateLimitError(`Все ${this.config.apiKeys.length} API ключей исчерпали дневную квоту. Попробуйте повторить запрос после 00:00 UTC.`);
+              }
+
+              // Переключаемся на следующий доступный ключ
+              this.switchToNextApiKey();
+              continue;
+            }
+
+            // Минутная квота (RPM) - можно подождать и повторить
             consecutiveRateLimitErrors++;
 
-            // Проверяем, все ли ключи исчерпали квоту
-            if (consecutiveRateLimitErrors >= maxApiKeyAttempts) {
-              // Все API ключи исчерпали квоту - нужно подождать обновления
-              console.error(`⚠️ ВСЕ ${maxApiKeyAttempts} API КЛЮЧЕЙ ИСЧЕРПАЛИ КВОТУ!`);
+            // Проверяем, все ли ДОСТУПНЫЕ ключи исчерпали минутную квоту
+            const availableKeys = this.getAvailableKeysCount();
+            if (consecutiveRateLimitErrors >= availableKeys) {
+              // Все доступные API ключи исчерпали минутную квоту - нужно подождать обновления
+              console.error(`⚠️ ВСЕ ${availableKeys} ДОСТУПНЫХ API КЛЮЧЕЙ ИСЧЕРПАЛИ МИНУТНУЮ КВОТУ!`);
 
               // Пытаемся извлечь время retry из сообщения об ошибке
               const retryMatch = apiError.message.match(/retry in ([\d.]+)s/i);
@@ -176,28 +229,26 @@ export class RequestHandler {
                 waitTime = Math.ceil(parseFloat(retryMatch[1]) * 1000) + 5000; // +5 секунд запас
               }
 
-              console.warn(`[ОЖИДАНИЕ] Ждём ${Math.ceil(waitTime / 1000)} секунд для обновления квот всех ключей...`);
+              console.warn(`[ОЖИДАНИЕ] Ждём ${Math.ceil(waitTime / 1000)} секунд для обновления минутных квот...`);
               await new Promise(resolve => setTimeout(resolve, waitTime));
 
               // Сбрасываем счётчики и начинаем сначала
               consecutiveRateLimitErrors = 0;
               apiKeyAttempts = 0;
-              console.log(`[ВОЗОБНОВЛЕНИЕ] Повторная попытка после ожидания обновления квот...`);
+              console.log(`[ВОЗОБНОВЛЕНИЕ] Повторная попытка после ожидания обновления минутных квот...`);
               continue;
             }
 
-            // Если не все ключи исчерпаны, переключаемся на следующий
+            // Если не все доступные ключи исчерпаны, переключаемся на следующий
             if (apiKeyAttempts < maxApiKeyAttempts - 1) {
               apiKeyAttempts++;
               const rateLimitedKeyPreview = apiKey.substring(0, 10) + '...';
               this.switchToNextApiKey();
-              const nextKeyPreview = this.getCurrentApiKey().substring(0, 10) + '...';
-              const message = `API ключ ${rateLimitedKeyPreview} (ключ #${currentKeyIndex + 1}) превысил квоту, переключаюсь на ключ #${this.currentApiKeyIndex + 1} (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
+              const message = `API ключ ${rateLimitedKeyPreview} (ключ #${currentKeyIndex + 1}) превысил минутную квоту, переключаюсь на ключ #${this.currentApiKeyIndex + 1} (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
               console.warn(`[ПЕРЕКЛЮЧЕНИЕ КЛЮЧА] ${message}`);
               if (this.config.debugMode) {
-                console.log(`[DEBUG] Причина: RateLimitError - ${apiError.message}`);
-                console.log(`[DEBUG] Следующий ключ: #${this.currentApiKeyIndex + 1}: ${nextKeyPreview}`);
-                console.log(`[DEBUG] Подряд RateLimitError: ${consecutiveRateLimitErrors}/${maxApiKeyAttempts}`);
+                console.log(`[DEBUG] Причина: RateLimitError (минутная) - ${apiError.message}`);
+                console.log(`[DEBUG] Подряд RateLimitError: ${consecutiveRateLimitErrors}/${availableKeys}`);
               }
               continue;
             }
