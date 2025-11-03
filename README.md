@@ -1,6 +1,6 @@
 # Google AI Kit
 
-> **Мощный TypeScript/JavaScript SDK для работы с Google Gemini AI API**
+> **TypeScript/JavaScript SDK для работы с Google Gemini AI API**
 
 Полнофункциональная библиотека с поддержкой прокси, множественных API ключей, автоматического переключения при ошибках, и простого Chat API
 
