@@ -34,6 +34,14 @@ export class GoogleAIError extends Error {
       Object.setPrototypeOf(this, APIKeyInvalidError.prototype);
     }
   }
+
+  export class APIKeyLeakedError extends GoogleAIError {
+    constructor(message: string = "API key was reported as leaked. Please use another API key.", details?: any) {
+      super(message, 400, details);
+      this.name = "APIKeyLeakedError";
+      Object.setPrototypeOf(this, APIKeyLeakedError.prototype);
+    }
+  }
   
   export class NetworkError extends GoogleAIError {
     constructor(message: string = "A network error occurred.") {
@@ -103,6 +111,12 @@ export class ConsumerSuspendedError extends GoogleAIError {
     const message = errorData?.error?.message || "An unknown API error occurred";
     const details = errorData?.error?.details;
     const status = errorData?.error?.status;
+  
+    // ---> НАЧАЛО ИЗМЕНЕНИЙ
+    // Проверка на сообщение об утечке ключа
+    if (message && message.toLowerCase().includes('was reported as leaked')) {
+      return new APIKeyLeakedError(message, details);
+    }
 
     // Проверка на специфичные ошибки через details
     if (details && Array.isArray(details)) {

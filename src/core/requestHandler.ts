@@ -2,7 +2,7 @@ import fetch, { RequestInit, Response } from 'node-fetch';
 import OriginalFormData from 'form-data';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { GeminiClientConfig, DEFAULT_GEMINI_CONFIG, ProxyConfig } from './config';
-import { APIKeyError, NetworkError, handleErrorResponse, GoogleAIError, ConsumerSuspendedError, RateLimitError, APIKeyExpiredError, APIKeyInvalidError } from './errors';
+import { APIKeyError, NetworkError, handleErrorResponse, GoogleAIError, ConsumerSuspendedError, RateLimitError, APIKeyExpiredError, APIKeyInvalidError, APIKeyLeakedError } from './errors';
 import { Readable } from 'stream';
 
 export class RequestHandler {
@@ -145,13 +145,18 @@ export class RequestHandler {
           const apiError = handleErrorResponse(response, errorData);
 
           // API Key Expired - переключаемся на следующий ключ
-          if (apiError instanceof APIKeyExpiredError && apiKeyAttempts < maxApiKeyAttempts - 1) {
+          if (apiError instanceof APIKeyLeakedError && apiKeyAttempts < maxApiKeyAttempts - 1) {
             apiKeyAttempts++;
-            const expiredKeyPreview = apiKey.substring(0, 10) + '...';
+            const leakedKeyPreview = apiKey.substring(0, 10) + '...';
             this.switchToNextApiKey();
+
+            if (this.currentApiKeyIndex === currentKeyIndex) {
+              throw new APIKeyLeakedError(`API ключ ${leakedKeyPreview} был скомпрометирован, и других ключей нет. ${apiError.message}`);
+            }
+
             const nextKeyPreview = this.getCurrentApiKey().substring(0, 10) + '...';
-            const message = `❌ API ключ ${expiredKeyPreview} (ключ #${currentKeyIndex + 1}) истёк, переключаюсь на ключ #${this.currentApiKeyIndex + 1} (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
-            console.error(`[API KEY EXPIRED] ${message}`);
+            const message = `[API KEY LEAKED] 💀 API ключ ${leakedKeyPreview} (ключ #${currentKeyIndex + 1}) скомпрометирован, переключаюсь на ключ #${this.currentApiKeyIndex + 1} (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
+            console.error(message);
             if (this.config.debugMode) {
               console.log(`[DEBUG] Причина: ${apiError.message}`);
               console.log(`[DEBUG] Следующий ключ: #${this.currentApiKeyIndex + 1}: ${nextKeyPreview}`);
@@ -164,6 +169,12 @@ export class RequestHandler {
             apiKeyAttempts++;
             const invalidKeyPreview = apiKey.substring(0, 10) + '...';
             this.switchToNextApiKey();
+
+            // Проверяем, не вернулись ли мы на тот же ключ (значит он единственный)
+            if (this.currentApiKeyIndex === currentKeyIndex) {
+              throw new APIKeyInvalidError(`API ключ ${invalidKeyPreview} невалиден и других ключей нет. ${apiError.message}`);
+            }
+
             const nextKeyPreview = this.getCurrentApiKey().substring(0, 10) + '...';
             const message = `❌ API ключ ${invalidKeyPreview} (ключ #${currentKeyIndex + 1}) невалиден или не найден, переключаюсь на ключ #${this.currentApiKeyIndex + 1} (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
             console.error(`[API KEY INVALID] ${message}`);
@@ -179,6 +190,12 @@ export class RequestHandler {
             apiKeyAttempts++;
             const suspendedKeyPreview = apiKey.substring(0, 10) + '...';
             this.switchToNextApiKey();
+
+            // Проверяем, не вернулись ли мы на тот же ключ (значит он единственный)
+            if (this.currentApiKeyIndex === currentKeyIndex) {
+              throw new ConsumerSuspendedError(`API ключ ${suspendedKeyPreview} приостановлен и других ключей нет. ${apiError.message}`);
+            }
+
             const nextKeyPreview = this.getCurrentApiKey().substring(0, 10) + '...';
             const message = `API ключ ${suspendedKeyPreview} (ключ #${currentKeyIndex + 1}) приостановлен, переключаюсь на ключ #${this.currentApiKeyIndex + 1} (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
             console.warn(`[ПЕРЕКЛЮЧЕНИЕ КЛЮЧА] ${message}`);
