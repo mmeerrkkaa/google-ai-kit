@@ -145,6 +145,26 @@ export class RequestHandler {
           const apiError = handleErrorResponse(response, errorData);
 
           // API Key Expired - переключаемся на следующий ключ
+          if (apiError instanceof APIKeyExpiredError && apiKeyAttempts < maxApiKeyAttempts - 1) {
+            apiKeyAttempts++;
+            const expiredKeyPreview = apiKey.substring(0, 10) + '...';
+            this.switchToNextApiKey();
+
+            if (this.currentApiKeyIndex === currentKeyIndex) {
+              throw new APIKeyExpiredError(`API ключ ${expiredKeyPreview} истёк, и других ключей нет. ${apiError.message}`);
+            }
+
+            const nextKeyPreview = this.getCurrentApiKey().substring(0, 10) + '...';
+            const message = `⏰ API ключ ${expiredKeyPreview} (ключ #${currentKeyIndex + 1}) истёк, переключаюсь на ключ #${this.currentApiKeyIndex + 1} (попытка ${apiKeyAttempts}/${maxApiKeyAttempts})`;
+            console.error(`[API KEY EXPIRED] ${message}`);
+            if (this.config.debugMode) {
+              console.log(`[DEBUG] Причина: ${apiError.message}`);
+              console.log(`[DEBUG] Следующий ключ: #${this.currentApiKeyIndex + 1}: ${nextKeyPreview}`);
+            }
+            continue;
+          }
+
+          // API Key Leaked - переключаемся на следующий ключ
           if (apiError instanceof APIKeyLeakedError && apiKeyAttempts < maxApiKeyAttempts - 1) {
             apiKeyAttempts++;
             const leakedKeyPreview = apiKey.substring(0, 10) + '...';
